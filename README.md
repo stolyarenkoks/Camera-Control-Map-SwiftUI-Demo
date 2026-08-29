@@ -1,5 +1,5 @@
-# Camera Control Map Demo
-An example of a custom animation of the user's avatar smoothly flowing and dissolving into the Dynamic Island, following the example of how it is done in Telegram. 
+# Camera Control Map SwiftUI Demo
+An example of driving a MapKit map's zoom with the iPhone Camera Control button, powered by a custom `AVCaptureSlider`.
 Developed entirely natively using Swift and SwiftUI.
 
 ![Demo](demo.gif)
@@ -13,10 +13,16 @@ No additional setup is needed. Build project using Xcode.
 ## Technologies
 * Swift
 * SwiftUI
+* MapKit
+* AVFoundation (Camera Control)
+
+## Requirements
+* iOS 18.0+ device with the Camera Control button for the hardware zoom
+* Camera permission (used only to expose the control, no feed is captured)
 
 ## Versions
-* Xcode 26.5 (latest)
-* Swift 5.8.1 (latest)
+* Xcode 26.6 (latest)
+* Swift 5
 
 ## Branches
 GitFlow is strictly enforced on this repository. [GitFlow](https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow)
