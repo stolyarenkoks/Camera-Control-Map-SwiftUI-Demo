@@ -47,6 +47,15 @@ extension MapView {
             }
         }
 
+        /// Whether the debug HUD should be shown (compiled in for DEBUG builds only).
+        var isDebugOverlayVisible: Bool {
+            #if DEBUG
+            true
+            #else
+            false
+            #endif
+        }
+
         var debugText: String {
             let zoom = String(format: "%.2f", lastReceivedZoom)
             return "CC: \(cameraControlStatus) · \(controlsActive ? "active" : "idle") · zoom \(zoom)"
@@ -90,6 +99,19 @@ extension MapView {
 
         func mapCameraChanged(to camera: MapCamera) {
             center = camera.centerCoordinate
+        }
+
+        /// Full-press of the Camera Control button flies the map back to the starting
+        /// place and zoom, and re-syncs the hardware slider to match.
+        func resetToInitial() {
+            center = place.coordinate
+            zoom = Const.Map.initialZoom
+            lastReceivedZoom = Const.Map.initialZoom
+            cameraControlManager.setZoom(Const.Map.initialZoom)
+
+            withAnimation(.easeInOut(duration: 0.5)) {
+                cameraPosition = ViewModel.makeCamera(center: place.coordinate, zoom: Const.Map.initialZoom)
+            }
         }
 
         // MARK: - Private Methods

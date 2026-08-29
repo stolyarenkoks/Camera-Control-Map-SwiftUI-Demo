@@ -39,6 +39,7 @@ nonisolated final class CameraControlManager: NSObject, @unchecked Sendable {
     // MARK: - Private Properties
 
     private let sessionQueue = DispatchQueue(label: Const.CameraControl.sessionQueueLabel)
+    private var zoomSlider: AVCaptureSlider?
 
     // MARK: - Internal Methods
 
@@ -66,6 +67,13 @@ nonisolated final class CameraControlManager: NSObject, @unchecked Sendable {
         sessionQueue.async { [weak self] in
             guard let self, self.session.isRunning else { return }
             self.session.stopRunning()
+        }
+    }
+
+    /// Syncs the hardware slider so the next Camera Control gesture continues from `value`.
+    func setZoom(_ value: Double) {
+        sessionQueue.async { [weak self] in
+            self?.zoomSlider?.value = Float(value)
         }
     }
 
@@ -120,6 +128,7 @@ nonisolated final class CameraControlManager: NSObject, @unchecked Sendable {
             return false
         }
         session.addControl(slider)
+        zoomSlider = slider
         return true
     }
 

@@ -21,7 +21,7 @@ nonisolated enum Const {
         static let maxDistance: Double = 6_000_000.0
 
         /// Normalized zoom (0...1). `1` is the closest, `0` is the farthest.
-        static let initialZoom: Double = 0.55
+        static let initialZoom: Double = 0.5
     }
 
     // MARK: - Camera Control

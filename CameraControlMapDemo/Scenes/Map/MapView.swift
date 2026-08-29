@@ -62,19 +62,17 @@ struct MapView: View {
                     .padding(.bottom, 24.0)
             }
         }
-        #if DEBUG
         .overlay(alignment: .topLeading) {
-            Text(viewModel.debugText)
-                .font(.caption2.monospaced())
-                .padding(8.0)
-                .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 8.0))
-                .foregroundStyle(.white)
-                .padding(.leading, 12.0)
+            if viewModel.isDebugOverlayVisible {
+                MapDebugOverlayView(text: viewModel.debugText)
+            }
         }
-        #endif
-        .onCameraCaptureEvent { _ in
-            // Claim the Camera Control button so iOS routes its light-press
-            // controls to our app instead of launching the system Camera.
+        .onCameraCaptureEvent { event in
+            // Claim the Camera Control button so iOS routes its light-press controls to
+            // our app instead of launching the system Camera. On a full press (release)
+            // we recenter the map back to the starting place and zoom.
+            guard event.phase == .ended else { return }
+            viewModel.resetToInitial()
         }
         .onAppear {
             viewModel.onAppear()
