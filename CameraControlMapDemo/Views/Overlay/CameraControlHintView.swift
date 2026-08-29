@@ -37,9 +37,16 @@ struct CameraControlHintView: View {
         .background(.ultraThinMaterial, in: Capsule())
         .overlay(Capsule().strokeBorder(.white.opacity(0.12)))
         .shadow(color: .black.opacity(0.2), radius: 12.0, y: 4.0)
-        .offset(x: isAnimating ? 6.0 : .zero)
-        .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: isAnimating)
-        .onAppear { isAnimating = true }
+        .fixedSize()
+        .offset(x: isAnimating ? 5.0 : -1.0)
+        .animation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true), value: isAnimating)
+        .onAppear {
+            // Defer the looping float until the entry transition settles; otherwise
+            // the first layout pass collides with it and the text drifts outside the capsule.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                isAnimating = true
+            }
+        }
     }
 
     // MARK: - Private Methods
@@ -52,31 +59,36 @@ struct CameraControlHintView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+        .fixedSize(horizontal: true, vertical: false)
     }
 
     private var chevrons: some View {
-        HStack(spacing: -3.0) {
-            ForEach(0..<3) { index in
-                Image(systemName: "chevron.compact.right")
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(.tint)
-                    .opacity(isAnimating ? 1.0 : 0.2)
-                    .animation(
-                        .easeInOut(duration: 0.6)
-                        .repeatForever()
-                        .delay(Double(index) * 0.18),
-                        value: isAnimating
-                    )
+        TimelineView(.animation) { context in
+            let time = context.date.timeIntervalSinceReferenceDate
+            HStack(spacing: 1.0) {
+                ForEach(0..<3) { index in
+                    Image(systemName: "chevron.compact.right")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.tint)
+                        .opacity(chevronOpacity(time: time, index: index))
+                }
             }
         }
+    }
+
+    /// A pulse that travels left-to-right across the chevrons, so they appear to "run".
+    private func chevronOpacity(time: TimeInterval, index: Int) -> Double {
+        let speed = 2.6
+        let phase = time * speed - Double(index) * 0.9
+        let wave = (sin(phase) + 1.0) / 2.0
+        return 0.25 + 0.75 * wave
     }
 
     private var cameraControlMark: some View {
         Capsule()
             .fill(.white)
-            .frame(width: 5.0, height: 34.0)
-            .shadow(color: .accentColor, radius: isAnimating ? 8.0 : 2.0)
-            .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: isAnimating)
+            .frame(width: 5.0, height: 32.0)
+            .shadow(color: .blue, radius: isAnimating ? 9.0 : 2.0)
     }
 }
 
@@ -86,6 +98,6 @@ struct CameraControlHintView: View {
     ZStack {
         LinearGradient(colors: [.teal, .indigo], startPoint: .top, endPoint: .bottom)
             .ignoresSafeArea()
-        CameraControlHintView(title: "Camera Control", subtitle: "Slide right to zoom the map")
+        CameraControlHintView(title: "Camera Control", subtitle: "Press, then slide to zoom")
     }
 }

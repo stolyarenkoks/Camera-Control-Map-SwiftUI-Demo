@@ -6,9 +6,11 @@
 //  Copyright © 2026 SKS. All rights reserved.
 //
 
+import AVFoundation
 import Combine
 import MapKit
 import SwiftUI
+import UIKit
 
 extension MapView {
 
@@ -19,15 +21,35 @@ extension MapView {
         // MARK: - Internal Properties
 
         @Published var cameraPosition: MapCameraPosition
-        @Published private(set) var isCameraControlAvailable = false
+        @Published private(set) var cameraControlStatus: CameraControlStatus = .checking
+        @Published private(set) var controlsActive = false
+        @Published private(set) var lastReceivedZoom = Const.Map.initialZoom
 
         var placeTitle: String { place.title }
         var placeCoordinate: CLLocationCoordinate2D { place.coordinate }
+        var captureSession: AVCaptureSession { cameraControlManager.session }
+
+        var isHintVisible: Bool { cameraControlStatus == .available && !controlsActive }
+        var isSettingsButtonVisible: Bool { cameraControlStatus == .permissionDenied }
+
+        /// A visible camera preview is required for iOS to route Camera Control to the app,
+        /// so the viewfinder is shown (as a small PiP) whenever the control is available.
+        var isPreviewVisible: Bool { cameraControlStatus == .available }
 
         var hintTitle: String { Const.Overlay.hintTitle }
+        var hintSubtitle: String { Const.Overlay.hintAvailable }
 
-        var hintSubtitle: String {
-            isCameraControlAvailable ? Const.Overlay.hintAvailable : Const.Overlay.hintUnavailable
+        var statusMessage: String? {
+            switch cameraControlStatus {
+            case .unsupported: Const.Overlay.unsupportedMessage
+            case .permissionDenied: Const.Overlay.permissionMessage
+            case .checking, .available: nil
+            }
+        }
+
+        var debugText: String {
+            let zoom = String(format: "%.2f", lastReceivedZoom)
+            return "CC: \(cameraControlStatus) · \(controlsActive ? "active" : "idle") · zoom \(zoom)"
         }
 
         // MARK: - Private Properties
@@ -51,7 +73,15 @@ extension MapView {
         // MARK: - Internal Methods
 
         func onAppear() {
+            #if targetEnvironment(simulator)
+            cameraControlStatus = .unsupported
+            #else
+            guard UIDevice.current.userInterfaceIdiom == .phone else {
+                cameraControlStatus = .unsupported
+                return
+            }
             cameraControlManager.start(initialZoom: zoom)
+            #endif
         }
 
         func onDisappear() {
@@ -68,15 +98,23 @@ extension MapView {
             cameraControlManager.onZoomChange = { [weak self] value in
                 self?.applyZoom(value)
             }
-            cameraControlManager.onAvailabilityChange = { [weak self] available in
-                self?.isCameraControlAvailable = available
+            cameraControlManager.onStatusChange = { [weak self] status in
+                self?.cameraControlStatus = status
+            }
+            cameraControlManager.onControlsActiveChange = { [weak self] active in
+                self?.controlsActive = active
             }
         }
 
         /// Rebuilds the camera around the current center for the latest Camera Control value.
+        /// Animations are disabled so the map tracks the slider 1:1 without lag.
         private func applyZoom(_ value: Double) {
             zoom = value
-            withAnimation(.easeOut(duration: 0.2)) {
+            lastReceivedZoom = value
+
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
                 cameraPosition = ViewModel.makeCamera(center: center, zoom: value)
             }
         }

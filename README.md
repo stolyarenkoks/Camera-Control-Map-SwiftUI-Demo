@@ -1,5 +1,5 @@
 # Camera Control Map SwiftUI Demo
-An example of driving a MapKit map's zoom with the iPhone Camera Control button, powered by a custom `AVCaptureSlider`.
+An example of driving a MapKit map's zoom with the iPhone Camera Control button, powered by a custom AVCaptureSlider.
 Developed entirely natively using Swift and SwiftUI.
 
 ![Demo](demo.gif)
@@ -22,7 +22,7 @@ No additional setup is needed. Build project using Xcode.
 
 ## Versions
 * Xcode 26.6 (latest)
-* Swift 5
+* Swift 6
 
 ## Branches
 GitFlow is strictly enforced on this repository. [GitFlow](https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow)

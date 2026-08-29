@@ -8,39 +8,57 @@
 
 import AVFoundation
 
+// MARK: - CameraControlStatus
+
+enum CameraControlStatus: Sendable {
+    /// Availability is still being resolved.
+    case checking
+    /// The device exposes Camera Control and the zoom control is active.
+    case available
+    /// The device has no Camera Control (iPad, Simulator, or older iPhone).
+    case unsupported
+    /// Camera access is required but was not granted.
+    case permissionDenied
+}
+
 // MARK: - CameraControlManager
 
-/// Runs a lightweight capture session for the sole purpose of exposing a custom
-/// zoom `AVCaptureSlider` on the iPhone Camera Control hardware button.
-/// The camera feed itself is never displayed — only the hardware control is reused.
-final class CameraControlManager: NSObject {
+/// Runs a capture session so the iPhone Camera Control button can drive a custom
+/// zoom `AVCaptureSlider`. A (hidden) preview keeps the session a valid capture
+/// experience so the hardware routes its light-press gesture to our control.
+nonisolated final class CameraControlManager: NSObject, @unchecked Sendable {
 
     // MARK: - Internal Properties
 
-    /// Called on the main queue with the latest Camera Control zoom value (0...1).
-    var onZoomChange: ((Double) -> Void)?
+    let session = AVCaptureSession()
 
-    /// Called on the main queue once it is known whether the device exposes Camera Control.
-    var onAvailabilityChange: ((Bool) -> Void)?
+    var onZoomChange: (@MainActor @Sendable (Double) -> Void)?
+    var onStatusChange: (@MainActor @Sendable (CameraControlStatus) -> Void)?
+    var onControlsActiveChange: (@MainActor @Sendable (Bool) -> Void)?
 
     // MARK: - Private Properties
 
-    private let session = AVCaptureSession()
     private let sessionQueue = DispatchQueue(label: Const.CameraControl.sessionQueueLabel)
 
     // MARK: - Internal Methods
 
+    /// Starts the session for a device that may support Camera Control (a real iPhone).
+    /// Simulator/iPad gating is handled by the caller before invoking this method.
     func start(initialZoom: Double) {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
-            configureSession(initialZoom: initialZoom)
+            configure(initialZoom: initialZoom)
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
-                guard granted else { return }
-                self?.configureSession(initialZoom: initialZoom)
+                guard let self else { return }
+                if granted {
+                    self.configure(initialZoom: initialZoom)
+                } else {
+                    self.notifyStatus(.permissionDenied)
+                }
             }
         default:
-            notifyAvailability(false)
+            notifyStatus(.permissionDenied)
         }
     }
 
@@ -53,7 +71,7 @@ final class CameraControlManager: NSObject {
 
     // MARK: - Private Methods
 
-    private func configureSession(initialZoom: Double) {
+    private func configure(initialZoom: Double) {
         sessionQueue.async { [weak self] in
             guard let self else { return }
 
@@ -65,19 +83,27 @@ final class CameraControlManager: NSObject {
             if available {
                 self.session.startRunning()
             }
-            self.notifyAvailability(available)
+
+            print("[CameraControl] controls available: \(available)")
+            self.notifyStatus(available ? .available : .unsupported)
         }
     }
 
     private func addVideoInput() {
         guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
               let input = try? AVCaptureDeviceInput(device: device),
-              session.canAddInput(input) else { return }
+              session.canAddInput(input) else {
+            print("[CameraControl] no video input available")
+            return
+        }
         session.addInput(input)
     }
 
     private func addZoomControl(initialZoom: Double) -> Bool {
-        guard session.supportsControls else { return false }
+        guard session.supportsControls else {
+            print("[CameraControl] session does not support controls")
+            return false
+        }
 
         session.setControlsDelegate(self, queue: sessionQueue)
 
@@ -86,30 +112,48 @@ final class CameraControlManager: NSObject {
                                      in: 0...1)
         slider.value = Float(initialZoom)
         slider.setActionQueue(sessionQueue) { [weak self] value in
-            DispatchQueue.main.async { self?.onZoomChange?(Double(value)) }
+            self?.notifyZoom(Double(value))
         }
 
-        guard session.canAddControl(slider) else { return false }
+        guard session.canAddControl(slider) else {
+            print("[CameraControl] cannot add zoom control")
+            return false
+        }
         session.addControl(slider)
         return true
     }
 
-    private func notifyAvailability(_ available: Bool) {
-        DispatchQueue.main.async { [weak self] in
-            self?.onAvailabilityChange?(available)
-        }
+    private func notifyZoom(_ value: Double) {
+        guard let onZoomChange else { return }
+        Task { @MainActor in onZoomChange(value) }
+    }
+
+    private func notifyStatus(_ status: CameraControlStatus) {
+        guard let onStatusChange else { return }
+        Task { @MainActor in onStatusChange(status) }
+    }
+
+    private func notifyControlsActive(_ active: Bool) {
+        guard let onControlsActiveChange else { return }
+        Task { @MainActor in onControlsActiveChange(active) }
     }
 }
 
 // MARK: - AVCaptureSessionControlsDelegate
 
-extension CameraControlManager: AVCaptureSessionControlsDelegate {
+nonisolated extension CameraControlManager: AVCaptureSessionControlsDelegate {
 
-    func sessionControlsDidBecomeActive(_ session: AVCaptureSession) {}
+    func sessionControlsDidBecomeActive(_ session: AVCaptureSession) {
+        print("[CameraControl] controls became active")
+        notifyControlsActive(true)
+    }
 
     func sessionControlsWillEnterFullscreenAppearance(_ session: AVCaptureSession) {}
 
     func sessionControlsWillExitFullscreenAppearance(_ session: AVCaptureSession) {}
 
-    func sessionControlsDidBecomeInactive(_ session: AVCaptureSession) {}
+    func sessionControlsDidBecomeInactive(_ session: AVCaptureSession) {
+        print("[CameraControl] controls became inactive")
+        notifyControlsActive(false)
+    }
 }
