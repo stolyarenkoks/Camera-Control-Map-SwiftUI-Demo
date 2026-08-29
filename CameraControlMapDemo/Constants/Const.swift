@@ -30,6 +30,10 @@ nonisolated enum Const {
         static let zoomTitle = "Map Zoom"
         static let zoomSymbol = "plus.magnifyingglass"
         static let sessionQueueLabel = "com.sks.cameracontrol.session"
+
+        /// Continuous slider range. A continuous (stepless) slider emits the finest
+        /// stream of values, giving the smoothest zoom as the Camera Control scrolls.
+        static let zoomRange: ClosedRange<Float> = 0...1
     }
 
     // MARK: - Overlay

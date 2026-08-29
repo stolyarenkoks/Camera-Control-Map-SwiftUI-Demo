@@ -109,7 +109,7 @@ nonisolated final class CameraControlManager: NSObject, @unchecked Sendable {
 
         let slider = AVCaptureSlider(Const.CameraControl.zoomTitle,
                                      symbolName: Const.CameraControl.zoomSymbol,
-                                     in: 0...1)
+                                     in: Const.CameraControl.zoomRange)
         slider.value = Float(initialZoom)
         slider.setActionQueue(sessionQueue) { [weak self] value in
             self?.notifyZoom(Double(value))

@@ -37,13 +37,14 @@ struct MapView: View {
         }
         .overlay(alignment: .topTrailing) {
             if viewModel.isPreviewVisible {
-                // iOS requires a visible, non-occluded preview to route Camera Control,
-                // so we keep it on screen but shrink it to a tiny, unobtrusive dot.
+                // Camera Control only routes its gesture to us while a capture preview
+                // is present in the view hierarchy. Verified on-device that its size,
+                // opacity, position and occlusion are irrelevant — only its existence
+                // matters — so we keep a 1×1 fully transparent, invisible preview.
                 CameraPreviewView(session: viewModel.captureSession)
-                    .frame(width: 10.0, height: 10.0)
-                    .clipShape(Circle())
-                    .padding(.top, 8.0)
-                    .padding(.trailing, 8.0)
+                    .frame(width: 1.0, height: 1.0)
+                    .opacity(.zero)
+                    .allowsHitTesting(false)
             }
         }
         .overlay(alignment: .trailing) {
